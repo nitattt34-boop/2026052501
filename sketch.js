@@ -1,72 +1,90 @@
 /**
- * 專案名稱：教科大冒險：知識氣球爆破戰
+ * 專案名稱：魔法互動拼字盤 (Interactive Phonics Magnets)
  * 開發者：Junci Chen
- * 互動邏輯：手勢瞄準 + 滑鼠點擊觸發爆炸特效
+ * 參考資源：Patt Vira - CT106_Interactive Fridge Magnets
+ * 特效限制：爆炸特效絕對不自動觸發，僅限滑鼠點擊。
  */
 
 let video;
 let handPose;
 let hands = [];
 
-// 遊戲物件
-let balloons = [];
+// 字母磁鐵
+let magnets = [];
+let targetWord = "APPLE";
+
+// 滑鼠點擊觸發的爆炸特效
 let particles = [];
-let score = 0;
-
-// 游標位置 (手部追蹤)
-let cursorX = 0;
-let cursorY = 0;
-let hasHand = false;
-
-// 數學題目庫 (作為教育科技的展示)
-let mathProblems = ["1+1", "2x3", "8÷2", "5+4", "7-3"];
 
 function preload() {
+  // 載入 ml5.js 手部辨識，並設定鏡像翻轉
   handPose = ml5.handPose({ flipped: true });
 }
 
 function setup() {
   createCanvas(640, 480);
-  
-  // 設定攝影機並翻轉
   video = createCapture(VIDEO, { flipped: true });
   video.size(640, 480);
   video.hide();
-  
-  // 啟動手部追蹤
   handPose.detectStart(video, gotHands);
   
-  // 初始產生幾顆氣球
-  for (let i = 0; i < 4; i++) {
-    balloons.push(new Balloon());
+  // 建立字母磁鐵，隨機散落在畫面上方
+  let chars = targetWord.split('');
+  for (let i = 0; i < chars.length; i++) {
+    magnets.push(new Magnet(chars[i], random(50, width - 50), random(50, 150)));
   }
+}
+
+function gotHands(results) {
+  hands = results;
 }
 
 function draw() {
   image(video, 0, 0, width, height);
   
-  // 加上深色半透明遮罩，讓畫面UI更清楚
-  fill(0, 0, 0, 120);
+  // 加上半透明白色遮罩，讓畫面像一塊白板
+  fill(255, 255, 255, 180);
   rect(0, 0, width, height);
-
-  // 顯示分數
-  fill(255);
-  textSize(24);
-  textAlign(LEFT, TOP);
-  text("Score: " + score, 20, 20);
   
-  // 更新與繪製氣球
-  for (let i = balloons.length - 1; i >= 0; i--) {
-    balloons[i].update();
-    balloons[i].display();
+  // 繪製教學區提示與放置框
+  drawUI();
+  
+  let isPinching = false;
+  let pinchX = 0;
+  let pinchY = 0;
+  
+  // 偵測手勢捏合
+  if (hands.length > 0) {
+    let thumb = hands[0].thumb_tip;
+    let index = hands[0].index_finger_tip;
     
-    // 如果氣球飄出上方，重置它
-    if (balloons[i].y < -50) {
-      balloons[i].reset();
+    if (thumb && index) {
+      pinchX = (thumb.x + index.x) / 2;
+      pinchY = (thumb.y + index.y) / 2;
+      
+      // 計算指尖距離
+      let d = dist(thumb.x, thumb.y, index.x, index.y);
+      
+      // 若距離小於 40 視為捏合
+      if (d < 40) {
+        isPinching = true;
+        fill(255, 50, 50); // 捏合時顯示紅色
+      } else {
+        fill(50, 200, 50); // 張開時顯示綠色
+      }
+      
+      noStroke();
+      circle(pinchX, pinchY, 20); // 畫出手部游標
     }
   }
-
-  // 更新與繪製點擊後產生的爆炸粒子特效
+  
+  // 更新與繪製磁鐵
+  for (let m of magnets) {
+    m.update(isPinching, pinchX, pinchY);
+    m.display();
+  }
+  
+  // 更新與繪製「僅限滑鼠點擊觸發」的特效粒子
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update();
     particles[i].display();
@@ -74,144 +92,134 @@ function draw() {
       particles.splice(i, 1);
     }
   }
-
-  // 更新手部準心位置
-  if (hands.length > 0) {
-    let indexTip = hands[0].index_finger_tip;
-    if (indexTip) {
-      cursorX = indexTip.x;
-      cursorY = indexTip.y;
-      hasHand = true;
-    }
-  } else {
-    hasHand = false;
-  }
-
-  // 畫出瞄準準心
-  if (hasHand) {
-    drawAimCursor(cursorX, cursorY);
-  }
 }
 
-// 取得辨識資料
-function gotHands(results) {
-  hands = results;
-}
-
-// 核心互動邏輯：只有點擊滑鼠時，才會觸發爆炸與判定
-function mousePressed() {
-  // 如果有抓到手，用手部座標；如果沒有，允許用滑鼠座標測試
-  let targetX = hasHand ? cursorX : mouseX;
-  let targetY = hasHand ? cursorY : mouseY;
-
-  // 檢查是否點擊到氣球
-  for (let i = balloons.length - 1; i >= 0; i--) {
-    let d = dist(targetX, targetY, balloons[i].x, balloons[i].y);
-    
-    if (d < balloons[i].r) {
-      // 成功擊中氣球：觸發爆炸特效 (不隨機，由點擊嚴格控制)
-      createExplosion(balloons[i].x, balloons[i].y, balloons[i].col);
-      score += 10;
-      balloons[i].reset(); // 重置氣球到底部
-      break; // 一次點擊只爆破一顆
-    }
-  }
-}
-
-// 繪製科技感準心
-function drawAimCursor(x, y) {
-  push();
-  translate(x, y);
-  stroke(0, 255, 0);
+// 教學介面 UI
+function drawUI() {
+  stroke(0);
   strokeWeight(2);
   noFill();
-  circle(0, 0, 40);
-  line(-25, 0, -10, 0);
-  line(25, 0, 10, 0);
-  line(0, -25, 0, -10);
-  line(0, 25, 0, 10);
-  fill(255, 0, 0);
+  drawingContext.setLineDash([10, 10]); // 虛線框
+  rectMode(CENTER);
+  rect(width / 2, height - 100, 400, 100, 15);
+  drawingContext.setLineDash([]); // 恢復實線
+  
   noStroke();
-  circle(0, 0, 6);
-  pop();
+  fill(50);
+  textAlign(CENTER, BOTTOM);
+  textSize(24);
+  text("將字母拖曳至此框，拼出 " + targetWord, width / 2, height - 160);
+  
+  textSize(16);
+  fill(100);
+  text("老師確認拼字正確後，點擊畫面施放煙火！", width / 2, height - 20);
 }
 
-// 產生爆炸粒子
-function createExplosion(x, y, col) {
-  for (let i = 0; i < 30; i++) {
-    particles.push(new Particle(x, y, col));
+// ⚠️ 嚴格落實條件：動畫爆炸特效只能在此處透過滑鼠點擊觸發 ⚠️
+function mousePressed() {
+  createExplosion(mouseX, mouseY);
+}
+
+// 產生煙火粒子特效
+function createExplosion(x, y) {
+  // 一次產生 50 顆粒子
+  for (let i = 0; i < 50; i++) {
+    particles.push(new Particle(x, y));
   }
 }
 
-// --- 氣球類別 ---
-class Balloon {
-  constructor() {
-    this.reset();
+// === 字母磁鐵類別 ===
+class Magnet {
+  constructor(char, x, y) {
+    this.char = char;
+    this.x = x;
+    this.y = y;
+    this.size = 60;
+    this.isDragging = false;
+    this.offsetX = 0;
+    this.offsetY = 0;
   }
   
-  reset() {
-    this.r = random(30, 45);
-    this.x = random(this.r, width - this.r);
-    this.y = height + this.r + random(50, 200); // 從底部產生
-    this.speed = random(1.5, 3);
-    this.col = color(random(100, 255), random(100, 255), random(100, 255), 200);
-    this.text = random(mathProblems);
-  }
-  
-  update() {
-    this.y -= this.speed; // 向上飄
-    this.x += sin(frameCount * 0.03 + this.y * 0.05) * 0.5; // 微微左右晃
+  update(isPinching, px, py) {
+    if (isPinching) {
+      // 判斷是否碰到這個磁鐵
+      if (!this.isDragging) {
+        let d = dist(px, py, this.x, this.y);
+        if (d < this.size / 2) {
+          // 檢查有沒有其他磁鐵已經被抓起來了 (避免一次抓兩個)
+          let othersDragging = magnets.some(m => m.isDragging && m !== this);
+          if (!othersDragging) {
+             this.isDragging = true;
+             // 記錄偏差值，讓拖曳不瞬移
+             this.offsetX = this.x - px;
+             this.offsetY = this.y - py;
+          }
+        }
+      }
+    } else {
+      this.isDragging = false; // 手指放開就停止拖曳
+    }
+    
+    // 如果正在拖曳，更新位置
+    if (this.isDragging) {
+      this.x = px + this.offsetX;
+      this.y = py + this.offsetY;
+    }
   }
   
   display() {
     push();
     translate(this.x, this.y);
+    rectMode(CENTER);
     
-    // 畫氣球線
-    stroke(255, 150);
-    strokeWeight(1);
-    line(0, this.r, 0, this.r + 30);
+    // 拖曳時加深顏色
+    if (this.isDragging) fill(255, 180, 50);
+    else fill(255, 230, 100);
     
-    // 畫氣球本體
+    stroke(50);
+    strokeWeight(3);
+    rect(0, 0, this.size, this.size, 8);
+    
+    // 字母陰影與文字
     noStroke();
-    fill(this.col);
-    circle(0, 0, this.r * 2);
-    
-    // 畫文字
-    fill(255);
+    fill(0, 0, 0, 50);
     textAlign(CENTER, CENTER);
-    textSize(20);
-    text(this.text, 0, 0);
+    textSize(36);
+    text(this.char, 2, 2); // 陰影
+    fill(0);
+    text(this.char, 0, 0); // 實體字
     pop();
   }
 }
 
-// --- 爆炸粒子類別 (取代隨機爆炸) ---
+// === 特效粒子類別 ===
 class Particle {
-  constructor(x, y, col) {
+  constructor(x, y) {
     this.x = x;
     this.y = y;
-    this.vx = random(-5, 5);
-    this.vy = random(-5, 5);
+    // 隨機噴發速度
+    this.vx = random(-8, 8);
+    this.vy = random(-8, 8);
     this.alpha = 255;
-    this.col = col;
-    this.size = random(4, 10);
+    // 隨機鮮豔色彩
+    this.col = color(random(150, 255), random(150, 255), random(150, 255));
+    this.size = random(5, 12);
   }
   
   update() {
     this.x += this.vx;
     this.y += this.vy;
-    this.alpha -= 10; // 逐漸透明
+    this.vy += 0.3; // 重力效果讓粒子往下墜
+    this.alpha -= 6; // 逐漸透明消失
   }
   
   display() {
     noStroke();
-    // 將氣球顏色帶入粒子並加上透明度
     fill(red(this.col), green(this.col), blue(this.col), this.alpha);
     circle(this.x, this.y, this.size);
   }
   
   isDead() {
-    return this.alpha <= 0;
+    return this.alpha < 0;
   }
 }
