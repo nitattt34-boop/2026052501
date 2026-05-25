@@ -43,6 +43,18 @@ function draw() {
   // 繪製教學區提示與放置框
   drawUI();
   
+  // 【視覺化 AI 骨架】畫出所有偵測到的手部關節點
+  // 這能幫助我們確認攝影機與 AI 模型是否正常運作中！
+  for (let i = 0; i < hands.length; i++) {
+    let hand = hands[i];
+    for (let j = 0; j < hand.keypoints.length; j++) {
+      let kp = hand.keypoints[j];
+      fill(0, 255, 0, 150); // 半透明綠色點
+      noStroke();
+      circle(kp.x, kp.y, 8);
+    }
+  }
+  
   // 每隔一段時間 (約 60 影格) 隨機生成一顆水果
   if (frameCount % 60 === 0) {
     fruits.push(new Fruit());
@@ -54,7 +66,8 @@ function draw() {
   
   // 偵測食指作為武士刀
   if (hands.length > 0) {
-    let index = hands[0].index_finger_tip;
+    // 取得食指尖端，加入 keypoints[8] 作為備用寫法確保相容性
+    let index = hands[0].index_finger_tip || hands[0].keypoints[8];
     if (index) {
       currentX = index.x;
       currentY = index.y;
@@ -69,6 +82,7 @@ function draw() {
       
       // 在食指尖端畫一個紅色的瞄準點，確認攝影機有準確抓到位置
       fill(255, 50, 50);
+      noStroke(); // 確保不會被其他的線條設定影響
       circle(currentX, currentY, 15);
     }
   } else {
