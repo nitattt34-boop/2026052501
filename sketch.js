@@ -22,6 +22,10 @@ function setup() {
   video.size(640, 480);
   video.hide();
 
+  console.log('ml5 loaded:', typeof ml5 !== 'undefined');
+  console.log('ml5.handPose:', typeof ml5.handPose);
+  console.log('ml5.handpose:', typeof ml5.handpose);
+
   // 初始化 ml5 手勢模型
   handPose = ml5.handPose(video, { flipHorizontal: true }, () => {
     console.log('HandPose model loaded');
