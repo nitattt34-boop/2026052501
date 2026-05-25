@@ -16,6 +16,8 @@ let bladeTrail = []; // 儲存手指揮動的軌跡
 // 切割時觸發的特效粒子
 let particles = [];
 
+const FRUIT_EMOJIS = ['🍎', '🍊', '🍇', '🍉', '🍓', '🍑', '🍍', '🥝'];
+
 function setup() {
   createCanvas(640, 480);
   video = createCapture(VIDEO);
@@ -44,32 +46,22 @@ function gotHands(results) {
 }
 
 function draw() {
+  // 畫面鏡像翻轉，讓動作像照鏡子一樣直覺
+  push();
+  translate(width, 0);
+  scale(-1, 1);
   image(video, 0, 0, width, height);
+  pop();
   
   // 加上半透明白色遮罩，讓畫面像一塊白板
-  fill(255, 255, 255, 180);
+  fill(255, 255, 255, 120); // 降低透明度，也稍微減少效能負擔
   rect(0, 0, width, height);
   
   // 繪製教學區提示與放置框
   drawUI();
   
-  // 【視覺化 AI 骨架】畫出所有偵測到的手部關節點
-  // 這能幫助我們確認攝影機與 AI 模型是否正常運作中！
-  for (let i = 0; i < hands.length; i++) {
-    let hand = hands[i];
-    let points = hand.landmarks || hand.keypoints || [];
-    for (let j = 0; j < points.length; j++) {
-      let kp = points[j];
-      let x = kp[0] ?? kp.x;
-      let y = kp[1] ?? kp.y;
-      fill(0, 255, 0, 150); // 半透明綠色點
-      noStroke();
-      circle(x, y, 8);
-    }
-  }
-  
-  // 每隔一段時間 (約 60 影格) 隨機生成一顆水果
-  if (frameCount % 60 === 0) {
+  // 加快水果出現的速度 (從 60 影格加快到 35 影格)
+  if (frameCount % 35 === 0) {
     fruits.push(new Fruit());
   }
   
@@ -96,10 +88,13 @@ function draw() {
         bladeTrail.shift(); 
       }
       
-      // 在食指尖端畫一個紅色的瞄準點，確認攝影機有準確抓到位置
-      fill(255, 50, 50);
-      noStroke(); // 確保不會被其他的線條設定影響
-      circle(currentX, currentY, 15);
+      // 在食指尖端畫一把菜刀 🔪
+      push();
+      translate(currentX, currentY);
+      textSize(60);
+      textAlign(RIGHT, BOTTOM);
+      text('🔪', 20, 20); 
+      pop();
     }
   } else {
     bladeTrail = []; // 沒偵測到手時清空軌跡
@@ -119,8 +114,8 @@ function draw() {
       let p2 = bladeTrail[bladeTrail.length - 2]; // 上一個點
       let speed = dist(p1.x, p1.y, p2.x, p2.y);   // 移動距離即為揮動速度
       
-      // 降低速度門檻 (大於 5)，並放寬碰撞半徑 (只要碰到水果邊緣就算切開)
-      if (speed > 5 && dist(currentX, currentY, f.x, f.y) < f.size) {
+      // 再次放寬切擊靈敏度 (速度 > 2 且碰撞半徑再稍微加大)
+      if (speed > 2 && dist(currentX, currentY, f.x, f.y) < f.size * 1.2) {
         f.slice();
         score += 10;
         createExplosion(f.x, f.y); // 自動觸發切開特效
@@ -184,8 +179,8 @@ class Fruit {
     this.y = height + 50;
     this.vx = random(-2, 2);
     this.vy = random(-12, -16); // 初速往上拋
-    this.size = random(50, 80);
-    this.color = color(random(100, 255), random(100, 255), random(100, 255));
+    this.size = random(60, 90);
+    this.emoji = random(FRUIT_EMOJIS); // 真實水果圖案 (Emoji)
     this.sliced = false;
     // 切開後兩半分離的距離
     this.leftHalf = 0;
@@ -208,14 +203,34 @@ class Fruit {
   
   display() {
     push();
-    noStroke();
-    fill(this.color);
+    translate(this.x, this.y);
+    textAlign(CENTER, CENTER);
+    textSize(this.size);
+    
     if (!this.sliced) {
-      circle(this.x, this.y, this.size);
+      text(this.emoji, 0, 0);
     } else {
-      // 畫出切開的兩半 (兩個半圓)
-      arc(this.x + this.leftHalf, this.y, this.size, this.size, HALF_PI, PI + HALF_PI);
-      arc(this.x + this.rightHalf, this.y, this.size, this.size, PI + HALF_PI, HALF_PI);
+      // 切開的左半邊
+      push();
+      translate(this.leftHalf, 0);
+      drawingContext.save();
+      drawingContext.beginPath();
+      drawingContext.rect(-this.size, -this.size, this.size, this.size * 2);
+      drawingContext.clip();
+      text(this.emoji, 0, 0);
+      drawingContext.restore();
+      pop();
+      
+      // 切開的右半邊
+      push();
+      translate(this.rightHalf, 0);
+      drawingContext.save();
+      drawingContext.beginPath();
+      drawingContext.rect(0, -this.size, this.size, this.size * 2);
+      drawingContext.clip();
+      text(this.emoji, 0, 0);
+      drawingContext.restore();
+      pop();
     }
     pop();
   }
