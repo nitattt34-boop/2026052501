@@ -29,8 +29,14 @@ function setup() {
   // 初始化 ml5 手勢模型
   handPose = ml5.handPose(video, { flipHorizontal: true }, () => {
     console.log('HandPose model loaded');
+    if (handPose && typeof handPose.detectStart === 'function') {
+      handPose.detectStart(video, gotHands);
+    } else if (handPose && typeof handPose.detect === 'function') {
+      handPose.detect(video, gotHands);
+    } else {
+      console.warn('HandPose detect API unavailable:', handPose);
+    }
   });
-  handPose.on('predict', gotHands);
 }
 
 function gotHands(results) {
