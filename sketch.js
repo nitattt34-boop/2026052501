@@ -16,17 +16,17 @@ let bladeTrail = []; // 儲存手指揮動的軌跡
 // 切割時觸發的特效粒子
 let particles = [];
 
-function preload() {
-  // 載入 ml5.js 手部辨識，並設定鏡像翻轉
-  handPose = ml5.handPose({ flipped: true });
-}
-
 function setup() {
   createCanvas(640, 480);
-  video = createCapture(VIDEO, { flipped: true });
+  video = createCapture(VIDEO);
   video.size(640, 480);
   video.hide();
-  handPose.detectStart(video, gotHands);
+
+  // 初始化 ml5 手勢模型
+  handPose = ml5.handpose(video, { flipHorizontal: true }, () => {
+    console.log('Handpose model loaded');
+  });
+  handPose.on('predict', gotHands);
 }
 
 function gotHands(results) {
@@ -47,11 +47,14 @@ function draw() {
   // 這能幫助我們確認攝影機與 AI 模型是否正常運作中！
   for (let i = 0; i < hands.length; i++) {
     let hand = hands[i];
-    for (let j = 0; j < hand.keypoints.length; j++) {
-      let kp = hand.keypoints[j];
+    let points = hand.landmarks || hand.keypoints || [];
+    for (let j = 0; j < points.length; j++) {
+      let kp = points[j];
+      let x = kp[0] ?? kp.x;
+      let y = kp[1] ?? kp.y;
       fill(0, 255, 0, 150); // 半透明綠色點
       noStroke();
-      circle(kp.x, kp.y, 8);
+      circle(x, y, 8);
     }
   }
   
@@ -66,11 +69,14 @@ function draw() {
   
   // 偵測食指作為武士刀
   if (hands.length > 0) {
-    // 取得食指尖端，加入 keypoints[8] 作為備用寫法確保相容性
-    let index = hands[0].index_finger_tip || hands[0].keypoints[8];
-    if (index) {
-      currentX = index.x;
-      currentY = index.y;
+    let hand = hands[0];
+    let index = (hand.landmarks && hand.landmarks[8]) || hand.index_finger_tip || (hand.keypoints && hand.keypoints[8]);
+    let indexX = index ? (index[0] ?? index.x) : null;
+    let indexY = index ? (index[1] ?? index.y) : null;
+
+    if (indexX !== null && indexY !== null) {
+      currentX = indexX;
+      currentY = indexY;
       isTracking = true;
       
       // 將當前點位加入軌跡陣列
