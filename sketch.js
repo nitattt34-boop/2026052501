@@ -66,6 +66,10 @@ function draw() {
       if (bladeTrail.length > 8) {
         bladeTrail.shift(); 
       }
+      
+      // 在食指尖端畫一個紅色的瞄準點，確認攝影機有準確抓到位置
+      fill(255, 50, 50);
+      circle(currentX, currentY, 15);
     }
   } else {
     bladeTrail = []; // 沒偵測到手時清空軌跡
@@ -85,8 +89,8 @@ function draw() {
       let p2 = bladeTrail[bladeTrail.length - 2]; // 上一個點
       let speed = dist(p1.x, p1.y, p2.x, p2.y);   // 移動距離即為揮動速度
       
-      // 若速度夠快 (大於 15) 且食指座標碰到水果
-      if (speed > 15 && dist(currentX, currentY, f.x, f.y) < f.size / 2) {
+      // 降低速度門檻 (大於 5)，並放寬碰撞半徑 (只要碰到水果邊緣就算切開)
+      if (speed > 5 && dist(currentX, currentY, f.x, f.y) < f.size) {
         f.slice();
         score += 10;
         createExplosion(f.x, f.y); // 自動觸發切開特效
