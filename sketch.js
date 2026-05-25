@@ -1,19 +1,19 @@
 /**
- * 專案名稱：魔法互動拼字盤 (Interactive Phonics Magnets)
+ * 專案名稱：忍者切切樂 (Fruit Ninja)
  * 開發者：Junci Chen
- * 參考資源：Patt Vira - CT106_Interactive Fridge Magnets
- * 特效限制：爆炸特效絕對不自動觸發，僅限滑鼠點擊。
+ * 單元設計：計算手指軌跡與移動速度，並結合拋物線物理引擎。
  */
 
 let video;
 let handPose;
 let hands = [];
 
-// 字母磁鐵
-let magnets = [];
-let targetWord = "APPLE";
+// 切切樂遊戲變數
+let fruits = [];
+let score = 0;
+let bladeTrail = []; // 儲存手指揮動的軌跡
 
-// 滑鼠點擊觸發的爆炸特效
+// 切割時觸發的特效粒子
 let particles = [];
 
 function preload() {
@@ -27,12 +27,6 @@ function setup() {
   video.size(640, 480);
   video.hide();
   handPose.detectStart(video, gotHands);
-  
-  // 建立字母磁鐵，隨機散落在畫面上方
-  let chars = targetWord.split('');
-  for (let i = 0; i < chars.length; i++) {
-    magnets.push(new Magnet(chars[i], random(50, width - 50), random(50, 150)));
-  }
 }
 
 function gotHands(results) {
@@ -111,7 +105,7 @@ function drawBlade() {
 // 教學介面 UI
 function drawUI() {
   fill(50);
-  noFill();
+  noStroke();
   textAlign(LEFT, TOP);
   textSize(24);
   text("得分: " + score, 20, 20);
