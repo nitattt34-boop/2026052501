@@ -94,101 +94,90 @@ function draw() {
   }
 }
 
-// 教學介面 UI
-function drawUI() {
-  stroke(0);
-  strokeWeight(2);
-  noFill();
-  drawingContext.setLineDash([10, 10]); // 虛線框
-  rectMode(CENTER);
-  rect(width / 2, height - 100, 400, 100, 15);
-  drawingContext.setLineDash([]); // 恢復實線
-  
-  noStroke();
-  fill(50);
-  textAlign(CENTER, BOTTOM);
-  textSize(24);
-  text("將字母拖曳至此框，拼出 " + targetWord, width / 2, height - 160);
-  
-  textSize(16);
-  fill(100);
-  text("老師確認拼字正確後，點擊畫面施放煙火！", width / 2, height - 20);
+// 繪製武士刀軌跡
+function drawBlade() {
+  if (bladeTrail.length > 1) {
+    noFill();
+    stroke(200, 255, 255, 200); // 淺藍色半透明刀光
+    strokeWeight(8);
+    beginShape();
+    for (let pt of bladeTrail) {
+      vertex(pt.x, pt.y);
+    }
+    endShape();
+  }
 }
 
-// ⚠️ 嚴格落實條件：動畫爆炸特效只能在此處透過滑鼠點擊觸發 ⚠️
-function mousePressed() {
-  createExplosion(mouseX, mouseY);
+// 教學介面 UI
+function drawUI() {
+  fill(50);
+  noFill();
+  textAlign(LEFT, TOP);
+  textSize(24);
+  text("得分: " + score, 20, 20);
+  
+  textAlign(CENTER, BOTTOM);
+  textSize(20);
+  text("伸出食指當作武士刀，在空中快速揮動切開水果！", width / 2, height - 20);
 }
 
 // 產生煙火粒子特效
 function createExplosion(x, y) {
-  // 一次產生 50 顆粒子
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 25; i++) {
     particles.push(new Particle(x, y));
   }
 }
 
-// === 字母磁鐵類別 ===
-class Magnet {
-  constructor(char, x, y) {
-    this.char = char;
-    this.x = x;
-    this.y = y;
-    this.size = 60;
-    this.isDragging = false;
-    this.offsetX = 0;
-    this.offsetY = 0;
+// === 水果類別 ===
+class Fruit {
+  constructor() {
+    this.x = random(100, width - 100);
+    this.y = height + 50;
+    this.vx = random(-2, 2);
+    this.vy = random(-12, -16); // 初速往上拋
+    this.size = random(50, 80);
+    this.color = color(random(100, 255), random(100, 255), random(100, 255));
+    this.sliced = false;
+    // 切開後兩半分離的距離
+    this.leftHalf = 0;
+    this.rightHalf = 0;
   }
   
-  update(isPinching, px, py) {
-    if (isPinching) {
-      // 判斷是否碰到這個磁鐵
-      if (!this.isDragging) {
-        let d = dist(px, py, this.x, this.y);
-        if (d < this.size / 2) {
-          // 檢查有沒有其他磁鐵已經被抓起來了 (避免一次抓兩個)
-          let othersDragging = magnets.some(m => m.isDragging && m !== this);
-          if (!othersDragging) {
-             this.isDragging = true;
-             // 記錄偏差值，讓拖曳不瞬移
-             this.offsetX = this.x - px;
-             this.offsetY = this.y - py;
-          }
-        }
-      }
+  update() {
+    if (!this.sliced) {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.4; // 地心引力 (往下加速)
     } else {
-      this.isDragging = false; // 手指放開就停止拖曳
-    }
-    
-    // 如果正在拖曳，更新位置
-    if (this.isDragging) {
-      this.x = px + this.offsetX;
-      this.y = py + this.offsetY;
+      // 切開後兩半往左右分開掉落
+      this.leftHalf -= 2;
+      this.rightHalf += 2;
+      this.y += this.vy;
+      this.vy += 0.6; // 切開後掉落得更快
     }
   }
   
   display() {
     push();
-    translate(this.x, this.y);
-    rectMode(CENTER);
-    
-    // 拖曳時加深顏色
-    if (this.isDragging) fill(255, 180, 50);
-    else fill(255, 230, 100);
-    
-    stroke(50);
-    strokeWeight(3);
-    rect(0, 0, this.size, this.size, 8);
-    
-    // 字母陰影與文字
     noStroke();
-    fill(0, 0, 0, 50);
-    textAlign(CENTER, CENTER);
-    textSize(36);
-    text(this.char, 2, 2); // 陰影
-    fill(0);
-    text(this.char, 0, 0); // 實體字
+    fill(this.color);
+    if (!this.sliced) {
+      circle(this.x, this.y, this.size);
+    } else {
+      // 畫出切開的兩半 (兩個半圓)
+      arc(this.x + this.leftHalf, this.y, this.size, this.size, HALF_PI, PI + HALF_PI);
+      arc(this.x + this.rightHalf, this.y, this.size, this.size, PI + HALF_PI, HALF_PI);
+    }
     pop();
+  }
+
+  slice() {
+    this.sliced = true;
+    this.vy = -3; // 模擬被切到時的停滯感與微弱向上的衝擊力
+  }
+  
+  isOffScreen() {
+    return this.y > height + 100;
   }
 }
 
