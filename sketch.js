@@ -23,8 +23,8 @@ function setup() {
   video.hide();
 
   // 初始化 ml5 手勢模型
-  handPose = ml5.handpose(video, { flipHorizontal: true }, () => {
-    console.log('Handpose model loaded');
+  handPose = ml5.handPose(video, { flipHorizontal: true }, () => {
+    console.log('HandPose model loaded');
   });
   handPose.on('predict', gotHands);
 }
