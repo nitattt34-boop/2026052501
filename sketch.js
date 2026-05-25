@@ -1,72 +1,105 @@
 /**
- * 專案名稱：教科大冒險：知識氣球爆破戰
+ * 專案名稱：忍者切切樂 (Fruit Ninja)
  * 開發者：Junci Chen
- * 互動邏輯：手勢瞄準 + 滑鼠點擊觸發爆炸特效
+ * 單元設計：計算手指軌跡與移動速度，並結合拋物線物理引擎。
  */
 
 let video;
 let handPose;
 let hands = [];
 
-// 遊戲物件
-let balloons = [];
-let particles = [];
+// 切切樂遊戲變數
+let fruits = [];
 let score = 0;
+let bladeTrail = []; // 儲存手指揮動的軌跡
 
-// 游標位置 (手部追蹤)
-let cursorX = 0;
-let cursorY = 0;
-let hasHand = false;
-
-// 數學題目庫 (作為教育科技的展示)
-let mathProblems = ["1+1", "2x3", "8÷2", "5+4", "7-3"];
+// 切割時觸發的特效粒子
+let particles = [];
 
 function preload() {
+  // 載入 ml5.js 手部辨識，並設定鏡像翻轉
   handPose = ml5.handPose({ flipped: true });
 }
 
 function setup() {
   createCanvas(640, 480);
-  
-  // 設定攝影機並翻轉
   video = createCapture(VIDEO, { flipped: true });
   video.size(640, 480);
   video.hide();
-  
-  // 啟動手部追蹤
   handPose.detectStart(video, gotHands);
-  
-  // 初始產生幾顆氣球
-  for (let i = 0; i < 4; i++) {
-    balloons.push(new Balloon());
-  }
+}
+
+function gotHands(results) {
+  hands = results;
 }
 
 function draw() {
   image(video, 0, 0, width, height);
   
-  // 加上深色半透明遮罩，讓畫面UI更清楚
-  fill(0, 0, 0, 120);
+  // 加上半透明白色遮罩，讓畫面像一塊白板
+  fill(255, 255, 255, 180);
   rect(0, 0, width, height);
-
-  // 顯示分數
-  fill(255);
-  textSize(24);
-  textAlign(LEFT, TOP);
-  text("Score: " + score, 20, 20);
   
-  // 更新與繪製氣球
-  for (let i = balloons.length - 1; i >= 0; i--) {
-    balloons[i].update();
-    balloons[i].display();
+  // 繪製教學區提示與放置框
+  drawUI();
+  
+  // 每隔一段時間 (約 60 影格) 隨機生成一顆水果
+  if (frameCount % 60 === 0) {
+    fruits.push(new Fruit());
+  }
+  
+  let currentX = 0;
+  let currentY = 0;
+  let isTracking = false;
+  
+  // 偵測食指作為武士刀
+  if (hands.length > 0) {
+    let index = hands[0].index_finger_tip;
+    if (index) {
+      currentX = index.x;
+      currentY = index.y;
+      isTracking = true;
+      
+      // 將當前點位加入軌跡陣列
+      bladeTrail.push(createVector(currentX, currentY));
+      // 限制軌跡長度，只保留最近的 8 個點
+      if (bladeTrail.length > 8) {
+        bladeTrail.shift(); 
+      }
+    }
+  } else {
+    bladeTrail = []; // 沒偵測到手時清空軌跡
+  }
+  
+  drawBlade(); // 畫出刀光軌跡
+  
+  // 更新與繪製水果，並檢查切割邏輯
+  for (let i = fruits.length - 1; i >= 0; i--) {
+    let f = fruits[i];
+    f.update();
+    f.display();
     
-    // 如果氣球飄出上方，重置它
-    if (balloons[i].y < -50) {
-      balloons[i].reset();
+    // 如果手部有被追蹤、水果還沒被切開，且有軌跡可以計算速度
+    if (isTracking && !f.sliced && bladeTrail.length >= 2) {
+      let p1 = bladeTrail[bladeTrail.length - 1]; // 當前點
+      let p2 = bladeTrail[bladeTrail.length - 2]; // 上一個點
+      let speed = dist(p1.x, p1.y, p2.x, p2.y);   // 移動距離即為揮動速度
+      
+      // 若速度夠快 (大於 15) 且食指座標碰到水果
+      if (speed > 15 && dist(currentX, currentY, f.x, f.y) < f.size / 2) {
+        f.slice();
+        score += 10;
+        createExplosion(f.x, f.y); // 自動觸發切開特效
+      }
+    }
+    
+    // 移除掉出畫面外的水果，節省效能
+    if (f.isOffScreen()) {
+      fruits.splice(i, 1);
     }
   }
-
-  // 更新與繪製點擊後產生的爆炸粒子特效
+  
+  // 更新與繪製特效粒子
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update();
     particles[i].display();
@@ -74,144 +107,123 @@ function draw() {
       particles.splice(i, 1);
     }
   }
+}
 
-  // 更新手部準心位置
-  if (hands.length > 0) {
-    let indexTip = hands[0].index_finger_tip;
-    if (indexTip) {
-      cursorX = indexTip.x;
-      cursorY = indexTip.y;
-      hasHand = true;
+// 繪製武士刀軌跡
+function drawBlade() {
+  if (bladeTrail.length > 1) {
+    noFill();
+    stroke(200, 255, 255, 200); // 淺藍色半透明刀光
+    strokeWeight(8);
+    beginShape();
+    for (let pt of bladeTrail) {
+      vertex(pt.x, pt.y);
     }
-  } else {
-    hasHand = false;
-  }
-
-  // 畫出瞄準準心
-  if (hasHand) {
-    drawAimCursor(cursorX, cursorY);
+    endShape();
   }
 }
 
-// 取得辨識資料
-function gotHands(results) {
-  hands = results;
-}
-
-// 核心互動邏輯：只有點擊滑鼠時，才會觸發爆炸與判定
-function mousePressed() {
-  // 如果有抓到手，用手部座標；如果沒有，允許用滑鼠座標測試
-  let targetX = hasHand ? cursorX : mouseX;
-  let targetY = hasHand ? cursorY : mouseY;
-
-  // 檢查是否點擊到氣球
-  for (let i = balloons.length - 1; i >= 0; i--) {
-    let d = dist(targetX, targetY, balloons[i].x, balloons[i].y);
-    
-    if (d < balloons[i].r) {
-      // 成功擊中氣球：觸發爆炸特效 (不隨機，由點擊嚴格控制)
-      createExplosion(balloons[i].x, balloons[i].y, balloons[i].col);
-      score += 10;
-      balloons[i].reset(); // 重置氣球到底部
-      break; // 一次點擊只爆破一顆
-    }
-  }
-}
-
-// 繪製科技感準心
-function drawAimCursor(x, y) {
-  push();
-  translate(x, y);
-  stroke(0, 255, 0);
-  strokeWeight(2);
-  noFill();
-  circle(0, 0, 40);
-  line(-25, 0, -10, 0);
-  line(25, 0, 10, 0);
-  line(0, -25, 0, -10);
-  line(0, 25, 0, 10);
-  fill(255, 0, 0);
+// 教學介面 UI
+function drawUI() {
+  fill(50);
   noStroke();
-  circle(0, 0, 6);
-  pop();
-}
-
-// 產生爆炸粒子
-function createExplosion(x, y, col) {
-  for (let i = 0; i < 30; i++) {
-    particles.push(new Particle(x, y, col));
-  }
-}
-
-// --- 氣球類別 ---
-class Balloon {
-  constructor() {
-    this.reset();
-  }
+  textAlign(LEFT, TOP);
+  textSize(24);
+  text("得分: " + score, 20, 20);
   
-  reset() {
-    this.r = random(30, 45);
-    this.x = random(this.r, width - this.r);
-    this.y = height + this.r + random(50, 200); // 從底部產生
-    this.speed = random(1.5, 3);
-    this.col = color(random(100, 255), random(100, 255), random(100, 255), 200);
-    this.text = random(mathProblems);
+  textAlign(CENTER, BOTTOM);
+  textSize(20);
+  text("伸出食指當作武士刀，在空中快速揮動切開水果！", width / 2, height - 20);
+}
+
+// 產生煙火粒子特效
+function createExplosion(x, y) {
+  for (let i = 0; i < 25; i++) {
+    particles.push(new Particle(x, y));
+  }
+}
+
+// === 水果類別 ===
+class Fruit {
+  constructor() {
+    this.x = random(100, width - 100);
+    this.y = height + 50;
+    this.vx = random(-2, 2);
+    this.vy = random(-12, -16); // 初速往上拋
+    this.size = random(50, 80);
+    this.color = color(random(100, 255), random(100, 255), random(100, 255));
+    this.sliced = false;
+    // 切開後兩半分離的距離
+    this.leftHalf = 0;
+    this.rightHalf = 0;
   }
   
   update() {
-    this.y -= this.speed; // 向上飄
-    this.x += sin(frameCount * 0.03 + this.y * 0.05) * 0.5; // 微微左右晃
+    if (!this.sliced) {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.4; // 地心引力 (往下加速)
+    } else {
+      // 切開後兩半往左右分開掉落
+      this.leftHalf -= 2;
+      this.rightHalf += 2;
+      this.y += this.vy;
+      this.vy += 0.6; // 切開後掉落得更快
+    }
   }
   
   display() {
     push();
-    translate(this.x, this.y);
-    
-    // 畫氣球線
-    stroke(255, 150);
-    strokeWeight(1);
-    line(0, this.r, 0, this.r + 30);
-    
-    // 畫氣球本體
     noStroke();
-    fill(this.col);
-    circle(0, 0, this.r * 2);
-    
-    // 畫文字
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(20);
-    text(this.text, 0, 0);
+    fill(this.color);
+    if (!this.sliced) {
+      circle(this.x, this.y, this.size);
+    } else {
+      // 畫出切開的兩半 (兩個半圓)
+      arc(this.x + this.leftHalf, this.y, this.size, this.size, HALF_PI, PI + HALF_PI);
+      arc(this.x + this.rightHalf, this.y, this.size, this.size, PI + HALF_PI, HALF_PI);
+    }
     pop();
+  }
+
+  slice() {
+    this.sliced = true;
+    this.vy = -3; // 模擬被切到時的停滯感與微弱向上的衝擊力
+  }
+  
+  isOffScreen() {
+    return this.y > height + 100;
   }
 }
 
-// --- 爆炸粒子類別 (取代隨機爆炸) ---
+// === 特效粒子類別 ===
 class Particle {
-  constructor(x, y, col) {
+  constructor(x, y) {
     this.x = x;
     this.y = y;
-    this.vx = random(-5, 5);
-    this.vy = random(-5, 5);
+    // 隨機噴發速度
+    this.vx = random(-8, 8);
+    this.vy = random(-8, 8);
     this.alpha = 255;
-    this.col = col;
-    this.size = random(4, 10);
+    // 隨機鮮豔色彩
+    this.col = color(random(150, 255), random(150, 255), random(150, 255));
+    this.size = random(5, 12);
   }
   
   update() {
     this.x += this.vx;
     this.y += this.vy;
-    this.alpha -= 10; // 逐漸透明
+    this.vy += 0.3; // 重力效果讓粒子往下墜
+    this.alpha -= 6; // 逐漸透明消失
   }
   
   display() {
     noStroke();
-    // 將氣球顏色帶入粒子並加上透明度
     fill(red(this.col), green(this.col), blue(this.col), this.alpha);
     circle(this.x, this.y, this.size);
   }
   
   isDead() {
-    return this.alpha <= 0;
+    return this.alpha < 0;
   }
 }
