@@ -43,42 +43,63 @@ function draw() {
   // 繪製教學區提示與放置框
   drawUI();
   
-  let isPinching = false;
-  let pinchX = 0;
-  let pinchY = 0;
+  // 每隔一段時間 (約 60 影格) 隨機生成一顆水果
+  if (frameCount % 60 === 0) {
+    fruits.push(new Fruit());
+  }
   
-  // 偵測手勢捏合
+  let currentX = 0;
+  let currentY = 0;
+  let isTracking = false;
+  
+  // 偵測食指作為武士刀
   if (hands.length > 0) {
-    let thumb = hands[0].thumb_tip;
     let index = hands[0].index_finger_tip;
-    
-    if (thumb && index) {
-      pinchX = (thumb.x + index.x) / 2;
-      pinchY = (thumb.y + index.y) / 2;
+    if (index) {
+      currentX = index.x;
+      currentY = index.y;
+      isTracking = true;
       
-      // 計算指尖距離
-      let d = dist(thumb.x, thumb.y, index.x, index.y);
-      
-      // 若距離小於 40 視為捏合
-      if (d < 40) {
-        isPinching = true;
-        fill(255, 50, 50); // 捏合時顯示紅色
-      } else {
-        fill(50, 200, 50); // 張開時顯示綠色
+      // 將當前點位加入軌跡陣列
+      bladeTrail.push(createVector(currentX, currentY));
+      // 限制軌跡長度，只保留最近的 8 個點
+      if (bladeTrail.length > 8) {
+        bladeTrail.shift(); 
       }
+    }
+  } else {
+    bladeTrail = []; // 沒偵測到手時清空軌跡
+  }
+  
+  drawBlade(); // 畫出刀光軌跡
+  
+  // 更新與繪製水果，並檢查切割邏輯
+  for (let i = fruits.length - 1; i >= 0; i--) {
+    let f = fruits[i];
+    f.update();
+    f.display();
+    
+    // 如果手部有被追蹤、水果還沒被切開，且有軌跡可以計算速度
+    if (isTracking && !f.sliced && bladeTrail.length >= 2) {
+      let p1 = bladeTrail[bladeTrail.length - 1]; // 當前點
+      let p2 = bladeTrail[bladeTrail.length - 2]; // 上一個點
+      let speed = dist(p1.x, p1.y, p2.x, p2.y);   // 移動距離即為揮動速度
       
-      noStroke();
-      circle(pinchX, pinchY, 20); // 畫出手部游標
+      // 若速度夠快 (大於 15) 且食指座標碰到水果
+      if (speed > 15 && dist(currentX, currentY, f.x, f.y) < f.size / 2) {
+        f.slice();
+        score += 10;
+        createExplosion(f.x, f.y); // 自動觸發切開特效
+      }
+    }
+    
+    // 移除掉出畫面外的水果，節省效能
+    if (f.isOffScreen()) {
+      fruits.splice(i, 1);
     }
   }
   
-  // 更新與繪製磁鐵
-  for (let m of magnets) {
-    m.update(isPinching, pinchX, pinchY);
-    m.display();
-  }
-  
-  // 更新與繪製「僅限滑鼠點擊觸發」的特效粒子
+  // 更新與繪製特效粒子
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update();
     particles[i].display();
