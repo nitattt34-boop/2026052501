@@ -14,7 +14,7 @@ let score = 0;
 let bladeTrail = []; // 儲存手指揮動的軌跡
 
 // 遊戲狀態與計時
-let gameState = 'start'; // 'start', 'playing', 'gameOver'
+let gameState = 'loading'; // 'loading', 'start', 'playing', 'gameOver'
 let startTime = 0;
 let gameDuration = 30000; // 30 秒 (30000 毫秒)
 
@@ -22,6 +22,7 @@ let gameDuration = 30000; // 30 秒 (30000 毫秒)
 let fruitsCutInSwipe = 0; // 一次揮刀切中的水果數量
 let isSwishing = false; // 是否正在揮動
 let audioCtx; // 用於合成音效的 AudioContext
+let bgmInterval; // 控制背景音樂的計時器
 
 // 切割時觸發的特效粒子
 let particles = [];
@@ -41,6 +42,7 @@ function setup() {
   // 初始化 ml5 手勢模型
   handPose = ml5.handPose(video, { flipHorizontal: true }, () => {
     console.log('HandPose model loaded');
+    gameState = 'start'; // 模型載入完畢，切換至開始畫面
     if (handPose && typeof handPose.detectStart === 'function') {
       handPose.detectStart(video, gotHands);
     } else if (handPose && typeof handPose.detect === 'function') {
@@ -68,6 +70,26 @@ function draw() {
   rect(0, 0, width, height);
   
   // === 遊戲狀態管理 ===
+  if (gameState === 'loading') {
+    fill(0, 0, 0, 200);
+    rect(0, 0, width, height);
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(32);
+    text("讀取AI手勢模型中，請稍候...", width / 2, height / 2);
+    
+    // 簡易的讀取旋轉動畫
+    push();
+    translate(width / 2, height / 2 + 60);
+    rotate(frameCount * 0.1);
+    stroke(255);
+    strokeWeight(4);
+    noFill();
+    arc(0, 0, 40, 40, 0, PI + HALF_PI);
+    pop();
+    return; // 暫停遊戲邏輯
+  }
+
   if (gameState === 'start') {
     fill(0, 0, 0, 150);
     rect(0, 0, width, height);
@@ -105,6 +127,7 @@ function draw() {
   if (timeLeft <= 0) {
     gameState = 'gameOver';
     timeLeft = 0;
+    stopBGM(); // 遊戲結束停止背景音樂
     playGameOverSound(); // 播放遊戲結束音效
   }
 
@@ -398,6 +421,7 @@ function mousePressed() {
     fruitsCutInSwipe = 0;
     startTime = millis();
     gameState = 'playing';
+    startBGM(); // 遊戲開始時播放背景音樂
   }
 }
 
@@ -467,4 +491,41 @@ function playGameOverSound() {
 
   osc.start(now);
   osc.stop(now + 1.5);
+}
+
+// === 輕快復古背景音樂系統 ===
+function startBGM() {
+  stopBGM(); // 確保不會重複播放
+  // 五聲音階 (C, D, E, G, A)，能營造輕快不違和的氣氛
+  const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]; 
+  let noteIndex = 0;
+  
+  bgmInterval = setInterval(() => {
+    if (gameState !== 'playing' || !audioCtx) return;
+    
+    let osc = audioCtx.createOscillator();
+    let gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = 'triangle'; // 柔和的三角波當作底噪音樂
+    
+    // 隨機挑選音符推進，製造輕快的節奏感
+    noteIndex = (noteIndex + Math.floor(random(1, 4))) % notes.length;
+    osc.frequency.setValueAtTime(notes[noteIndex], audioCtx.currentTime);
+    
+    // 短促的撥弦感
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.05); // 音量放小當作 BGM
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.3);
+  }, 250); // 每 0.25 秒播放一個音 (相當於 120 BPM 的八分音符)
+}
+
+function stopBGM() {
+  if (bgmInterval) {
+    clearInterval(bgmInterval);
+    bgmInterval = null;
+  }
 }
