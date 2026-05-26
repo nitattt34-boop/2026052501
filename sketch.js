@@ -417,9 +417,10 @@ function createGoldenExplosion(x, y) {
 
 // === 遊戲互動與音效系統 (使用內建 Web Audio API 合成聲音) ===
 function mousePressed() {
+  initAudio(); // 確保每次點擊都強制嘗試喚醒音效引擎
+
   // 點擊畫面重新開始或啟動遊戲，並解鎖瀏覽器音效限制
   if (gameState === 'start' || gameState === 'gameOver') {
-    initAudio();
     score = 0;
     fruits = [];
     particles = [];
@@ -434,10 +435,13 @@ function mousePressed() {
 function initAudio() {
   try {
     if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      window.AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new window.AudioContext();
     }
     if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
+      audioCtx.resume().then(() => {
+        console.log("🎵 音效已成功解鎖！(AudioContext Resumed)");
+      });
     }
   } catch (e) {
     console.error("Web Audio API 無法啟動", e);
@@ -449,15 +453,16 @@ function playSwish() {
   if (!audioCtx) return;
   let osc = audioCtx.createOscillator();
   let gain = audioCtx.createGain();
+  let now = audioCtx.currentTime + 0.05; // 加上 0.05 秒緩衝，避免 AI 運算卡頓吃掉聲音
   osc.connect(gain);
   gain.connect(audioCtx.destination);
   osc.type = 'sine'; // 改用正弦波搭配極速降頻，呈現銳利的風切聲
-  osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
-  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-  osc.start(audioCtx.currentTime);
-  osc.stop(audioCtx.currentTime + 0.15);
+  osc.frequency.setValueAtTime(1200, now);
+  osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+  gain.gain.setValueAtTime(0.5, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+  osc.start(now);
+  osc.stop(now + 0.15);
 }
 
 // 播放水果爆裂聲
@@ -465,15 +470,16 @@ function playBurst() {
   if (!audioCtx) return;
   let osc = audioCtx.createOscillator();
   let gain = audioCtx.createGain();
+  let now = audioCtx.currentTime + 0.05; // 加上 0.05 秒緩衝
   osc.connect(gain);
   gain.connect(audioCtx.destination);
   osc.type = 'sawtooth'; // 改用鋸齒波讓低頻爆裂聲更有粗糙的衝擊感
-  osc.frequency.setValueAtTime(350, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2);
-  gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-  osc.start(audioCtx.currentTime);
-  osc.stop(audioCtx.currentTime + 0.2);
+  osc.frequency.setValueAtTime(350, now);
+  osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+  gain.gain.setValueAtTime(0.6, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+  osc.start(now);
+  osc.stop(now + 0.2);
 }
 
 // 播放遊戲結束音效 (復古 8-bit 降調音效)
@@ -485,7 +491,7 @@ function playGameOverSound() {
   gain.connect(audioCtx.destination);
   osc.type = 'square'; // 使用復古的電子方波
 
-  let now = audioCtx.currentTime;
+  let now = audioCtx.currentTime + 0.05; // 加上 0.05 秒緩衝
   osc.frequency.setValueAtTime(400, now);
   osc.frequency.setValueAtTime(300, now + 0.2);
   osc.frequency.setValueAtTime(200, now + 0.4);
@@ -509,6 +515,7 @@ function startBGM() {
   bgmInterval = setInterval(() => {
     if (gameState !== 'playing' || !audioCtx) return;
     
+    let now = audioCtx.currentTime + 0.05; // 加上 0.05 秒緩衝
     let osc = audioCtx.createOscillator();
     let gain = audioCtx.createGain();
     osc.connect(gain);
@@ -517,15 +524,15 @@ function startBGM() {
     
     // 隨機挑選音符推進，製造輕快的節奏感
     noteIndex = (noteIndex + Math.floor(random(1, 4))) % notes.length;
-    osc.frequency.setValueAtTime(notes[noteIndex], audioCtx.currentTime);
+    osc.frequency.setValueAtTime(notes[noteIndex], now);
     
     // 短促的撥弦感
-    gain.gain.setValueAtTime(0, audioCtx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.05); // 音量放小當作 BGM
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.08, now + 0.05); // 音量放小當作 BGM
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
     
-    osc.start(audioCtx.currentTime);
-    osc.stop(audioCtx.currentTime + 0.3);
+    osc.start(now);
+    osc.stop(now + 0.3);
   }, 250); // 每 0.25 秒播放一個音 (相當於 120 BPM 的八分音符)
 }
 
