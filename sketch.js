@@ -30,6 +30,8 @@ let particles = [];
 const FRUIT_EMOJIS = ['🍎', '🍊', '🍇', '🍉', '🍓', '🍑', '🍍', '🥝'];
 
 function setup() {
+  console.log('--- 遊戲核心程式已成功更新並執行 ---');
+  
   createCanvas(640, 480);
   video = createCapture(VIDEO);
   video.size(640, 480);
@@ -76,8 +78,12 @@ function draw() {
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(32);
-    text("讀取AI手勢模型中，請稍候...", width / 2, height / 2);
+    text("讀取AI手勢模型中，請稍候...", width / 2, height / 2 - 20);
     
+    textSize(18);
+    fill(255, 255, 100); // 亮黃色
+    text("(如果您看到這行字，代表更新成功！)", width / 2, height / 2 + 30);
+
     // 簡易的讀取旋轉動畫
     push();
     translate(width / 2, height / 2 + 60);
