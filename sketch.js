@@ -13,6 +13,16 @@ let fruits = [];
 let score = 0;
 let bladeTrail = []; // 儲存手指揮動的軌跡
 
+// 遊戲狀態與計時
+let gameState = 'start'; // 'start', 'playing', 'gameOver'
+let startTime = 0;
+let gameDuration = 30000; // 30 秒 (30000 毫秒)
+
+// 連擊系統與音效狀態
+let fruitsCutInSwipe = 0; // 一次揮刀切中的水果數量
+let isSwishing = false; // 是否正在揮動
+let audioCtx; // 用於合成音效的 AudioContext
+
 // 切割時觸發的特效粒子
 let particles = [];
 
@@ -57,8 +67,48 @@ function draw() {
   fill(255, 255, 255, 120); // 降低透明度，也稍微減少效能負擔
   rect(0, 0, width, height);
   
+  // === 遊戲狀態管理 ===
+  if (gameState === 'start') {
+    fill(0, 0, 0, 150);
+    rect(0, 0, width, height);
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(32);
+    text("點擊畫面開始遊戲", width / 2, height / 2 - 20);
+    textSize(18);
+    fill(200);
+    text("(將啟動 30 秒計時與音效)", width / 2, height / 2 + 20);
+    return; // 暫停遊戲邏輯
+  }
+  
+  if (gameState === 'gameOver') {
+    fill(0, 0, 0, 180);
+    rect(0, 0, width, height);
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(40);
+    text("時間到！", width / 2, height / 2 - 80);
+    textSize(28);
+    text("最終得分: " + score, width / 2, height / 2 - 20);
+    
+    textSize(18);
+    fill(255, 215, 0); // 黃金色文字
+    text("伸出你的黃金食指武士刀，看準水果，\n大膽地刷刷刷，下一場最繽紛的水果糖果粒子雨吧", width / 2, height / 2 + 50);
+    
+    textSize(16);
+    fill(200);
+    text("點擊畫面可重新開始", width / 2, height / 2 + 130);
+    return; // 暫停遊戲邏輯
+  }
+  
+  let timeLeft = ceil((gameDuration - (millis() - startTime)) / 1000);
+  if (timeLeft <= 0) {
+    gameState = 'gameOver';
+    timeLeft = 0;
+  }
+
   // 繪製教學區提示與放置框
-  drawUI();
+  drawUI(timeLeft);
   
   // 加快水果出現的速度 (從 60 影格加快到 35 影格)
   if (frameCount % 35 === 0) {
@@ -98,10 +148,33 @@ function draw() {
     }
   } else {
     bladeTrail = []; // 沒偵測到手時清空軌跡
+    isSwishing = false;
+    fruitsCutInSwipe = 0; // 重置連擊次數
   }
   
   drawBlade(); // 畫出刀光軌跡
   
+  // 計算揮刀速度與音效、連擊邏輯
+  let currentSpeed = 0;
+  if (isTracking && bladeTrail.length >= 2) {
+    let p1 = bladeTrail[bladeTrail.length - 1];
+    let p2 = bladeTrail[bladeTrail.length - 2];
+    currentSpeed = dist(p1.x, p1.y, p2.x, p2.y);
+    
+    if (currentSpeed > 5) {
+      if (!isSwishing) {
+        playSwish(); // 揮刀速度夠快時播放「唰——」聲
+        isSwishing = true;
+      }
+    } else {
+      isSwishing = false;
+      fruitsCutInSwipe = 0; // 速度慢下來視為揮刀中斷，重置連擊
+    }
+  } else {
+    isSwishing = false;
+    fruitsCutInSwipe = 0;
+  }
+
   // 更新與繪製水果，並檢查切割邏輯
   for (let i = fruits.length - 1; i >= 0; i--) {
     let f = fruits[i];
@@ -110,15 +183,20 @@ function draw() {
     
     // 如果手部有被追蹤、水果還沒被切開，且有軌跡可以計算速度
     if (isTracking && !f.sliced && bladeTrail.length >= 2) {
-      let p1 = bladeTrail[bladeTrail.length - 1]; // 當前點
-      let p2 = bladeTrail[bladeTrail.length - 2]; // 上一個點
-      let speed = dist(p1.x, p1.y, p2.x, p2.y);   // 移動距離即為揮動速度
       
       // 再次放寬切擊靈敏度 (速度 > 2 且碰撞半徑再稍微加大)
-      if (speed > 2 && dist(currentX, currentY, f.x, f.y) < f.size * 1.2) {
+      if (currentSpeed > 2 && dist(currentX, currentY, f.x, f.y) < f.size * 1.2) {
         f.slice();
-        score += 10;
-        createExplosion(f.x, f.y); // 自動觸發切開特效
+        fruitsCutInSwipe++; // 增加連擊數量
+        
+        if (fruitsCutInSwipe >= 2) {
+          score += 20; // 黃金連擊獲得雙倍分數
+          createGoldenExplosion(f.x, f.y); // 爆發超級巨大金色煙火
+        } else {
+          score += 10;
+          createExplosion(f.x, f.y); // 一般煙火
+        }
+        playBurst(); // 播放水果爆裂聲，達到聽視覺同步
       }
     }
     
@@ -153,12 +231,16 @@ function drawBlade() {
 }
 
 // 教學介面 UI
-function drawUI() {
+function drawUI(timeLeft) {
   fill(50);
   noStroke();
   textAlign(LEFT, TOP);
   textSize(24);
   text("得分: " + score, 20, 20);
+  
+  // 顯示剩餘時間
+  textAlign(RIGHT, TOP);
+  text("時間: " + timeLeft + "s", width - 20, 20);
   
   textAlign(CENTER, BOTTOM);
   textSize(20);
@@ -275,4 +357,86 @@ class Particle {
   isDead() {
     return this.alpha < 0;
   }
+}
+
+// === 黃金隱藏版粒子類別 (繼承自一般粒子) ===
+class GoldenParticle extends Particle {
+  constructor(x, y) {
+    super(x, y);
+    this.vx = random(-15, 15); // 更廣泛的噴發範圍
+    this.vy = random(-15, 15);
+    this.col = color(255, 215, 0); // 純金色
+    this.size = random(8, 22); // 超級巨大的尺寸
+  }
+  
+  display() {
+    noStroke();
+    fill(255, 215, 0, this.alpha);
+    circle(this.x, this.y, this.size);
+    // 內部加上閃爍的白光核心
+    fill(255, 255, 255, this.alpha); 
+    circle(this.x, this.y, this.size * 0.4);
+  }
+}
+
+function createGoldenExplosion(x, y) {
+  for (let i = 0; i < 40; i++) {
+    particles.push(new GoldenParticle(x, y));
+  }
+}
+
+// === 遊戲互動與音效系統 (使用內建 Web Audio API 合成聲音) ===
+function mousePressed() {
+  // 點擊畫面重新開始或啟動遊戲，並解鎖瀏覽器音效限制
+  if (gameState === 'start' || gameState === 'gameOver') {
+    initAudio();
+    score = 0;
+    fruits = [];
+    particles = [];
+    bladeTrail = [];
+    fruitsCutInSwipe = 0;
+    startTime = millis();
+    gameState = 'playing';
+  }
+}
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+// 播放「唰——」刀切聲
+function playSwish() {
+  if (!audioCtx) return;
+  let osc = audioCtx.createOscillator();
+  let gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.1);
+}
+
+// 播放水果爆裂聲
+function playBurst() {
+  if (!audioCtx) return;
+  let osc = audioCtx.createOscillator();
+  let gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.15);
+  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.15);
 }
