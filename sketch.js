@@ -105,6 +105,7 @@ function draw() {
   if (timeLeft <= 0) {
     gameState = 'gameOver';
     timeLeft = 0;
+    playGameOverSound(); // 播放遊戲結束音效
   }
 
   // 繪製教學區提示與放置框
@@ -443,4 +444,27 @@ function playBurst() {
   gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
   osc.start(audioCtx.currentTime);
   osc.stop(audioCtx.currentTime + 0.2);
+}
+
+// 播放遊戲結束音效 (復古 8-bit 降調音效)
+function playGameOverSound() {
+  if (!audioCtx) return;
+  let osc = audioCtx.createOscillator();
+  let gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'square'; // 使用復古的電子方波
+
+  let now = audioCtx.currentTime;
+  osc.frequency.setValueAtTime(400, now);
+  osc.frequency.setValueAtTime(300, now + 0.2);
+  osc.frequency.setValueAtTime(200, now + 0.4);
+  osc.frequency.exponentialRampToValueAtTime(50, now + 1.5); // 經典的慢慢降調收尾
+
+  gain.gain.setValueAtTime(0.25, now);
+  gain.gain.setValueAtTime(0.25, now + 0.4);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5); // 聲音逐漸淡出
+
+  osc.start(now);
+  osc.stop(now + 1.5);
 }
