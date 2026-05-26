@@ -276,10 +276,10 @@ class Fruit {
       this.vy += 0.4; // 地心引力 (往下加速)
     } else {
       // 切開後兩半往左右分開掉落
-      this.leftHalf -= 2;
-      this.rightHalf += 2;
+      this.leftHalf -= 5;
+      this.rightHalf += 5;
       this.y += this.vy;
-      this.vy += 0.6; // 切開後掉落得更快
+      this.vy += 0.8; // 切開後掉落得更快，增加打擊回饋
     }
   }
   
@@ -416,13 +416,13 @@ function playSwish() {
   let gain = audioCtx.createGain();
   osc.connect(gain);
   gain.connect(audioCtx.destination);
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
-  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+  osc.type = 'sine'; // 改用正弦波搭配極速降頻，呈現銳利的風切聲
+  osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
+  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
   osc.start(audioCtx.currentTime);
-  osc.stop(audioCtx.currentTime + 0.1);
+  osc.stop(audioCtx.currentTime + 0.15);
 }
 
 // 播放水果爆裂聲
@@ -432,11 +432,11 @@ function playBurst() {
   let gain = audioCtx.createGain();
   osc.connect(gain);
   gain.connect(audioCtx.destination);
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.15);
-  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+  osc.type = 'sawtooth'; // 改用鋸齒波讓低頻爆裂聲更有粗糙的衝擊感
+  osc.frequency.setValueAtTime(350, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2);
+  gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
   osc.start(audioCtx.currentTime);
-  osc.stop(audioCtx.currentTime + 0.15);
+  osc.stop(audioCtx.currentTime + 0.2);
 }
